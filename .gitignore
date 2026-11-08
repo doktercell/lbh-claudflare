@@ -1,0 +1,20 @@
+# Dependensi & artefak build
+node_modules/
+.wrangler/
+dist/
+
+# Rahasia — JANGAN pernah di-commit
+.dev.vars
+.env
+.env.*
+opencode.jsonc
+*.zip
+
+# Log & sistem operasi
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

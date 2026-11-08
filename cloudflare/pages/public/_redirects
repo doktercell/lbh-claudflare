@@ -1,0 +1,8 @@
+# Aplikasi ini single-page dengan navigasi anchor (#beranda, #pengaduan, dst),
+# sehingga tidak memerlukan rewrite catch-all.
+#
+# Rute /api ditangani Pages Function (functions/api.js) melalui _routes.json.
+#
+# Jika nanti menambahkan halaman terpisah, tambahkan aturan eksplisit di sini.
+# Contoh:
+#   /panduan    /panduan.html    200

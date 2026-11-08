@@ -1,0 +1,5 @@
+# Salin file ini menjadi .dev.vars untuk `wrangler pages dev`
+# JANGAN commit .dev.vars (berisi rahasia).
+
+GAS_URL="https://script.google.com/macros/s/AKfycb.../exec"
+API_KEY="lbh_xxxxxxxxxxxxxxxxxxxxxxxx"

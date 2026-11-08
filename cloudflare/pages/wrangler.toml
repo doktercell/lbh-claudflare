@@ -1,0 +1,10 @@
+# Cloudflare Pages — konfigurasi build
+# https://developers.cloudflare.com/pages/configuration/build-configuration/
+
+[build]
+  # Frontend murni statis — tanpa proses build.
+  command = ""
+  publish_directory = "public"
+
+[build.environment]
+  NODE_VERSION = "20"

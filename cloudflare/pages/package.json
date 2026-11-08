@@ -1,0 +1,14 @@
+{
+  "name": "lbh-asysyuja",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend statis + Cloudflare Pages Function untuk LBH ASYSYUJA",
+  "scripts": {
+    "dev": "wrangler pages dev public --compatibility-date=2025-01-01",
+    "deploy": "wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

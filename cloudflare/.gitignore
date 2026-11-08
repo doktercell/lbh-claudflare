@@ -1,0 +1,15 @@
+# Dependency & artefak build
+node_modules/
+.wrangler/
+.dev.vars
+.env
+.env.*
+
+# Sistem operasi
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.log

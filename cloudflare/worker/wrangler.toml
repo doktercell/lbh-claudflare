@@ -1,0 +1,17 @@
+name = "lbh-asysyuja-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Worker ini berdiri sendiri sebagai proxy API.
+# Frontend statis di-deploy terpisah ke Cloudflare Pages.
+#
+# Secrets (jangan ditulis di file ini):
+#   npx wrangler secret put GAS_URL
+#   npx wrangler secret put API_KEY
+#
+# Opsional: batasi origin frontend
+# [vars]
+# ALLOWED_ORIGIN = "https://lbh-asysyuja.pages.dev"
+
+[observability]
+enabled = true
