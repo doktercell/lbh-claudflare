@@ -215,9 +215,10 @@ export default {
     } catch (err) {
       return jsonResponse({
         ok: false,
-        error: 'Tidak dapat menghubungi server backend. Periksa konfigurasi GAS_URL.',
+        error: 'Tidak dapat menghubungi backend Apps Script.',
         code: 'UPSTREAM_ERROR',
-        detail: String(err && err.message ? err.message : err)
+        detail: String(err && err.message ? err.message : err),
+        help: ['Periksa apakah GAS_URL benar dan deployment Web App masih aktif.']
       }, 502, cors);
     }
 
@@ -228,15 +229,38 @@ export default {
     try {
       payload = JSON.parse(text);
     } catch (err) {
-      // Apps Script kadang mengembalikan halaman HTML error.
+      // Respons HTML biasanya berarti: URL salah, akses bukan "Anyone",
+      // atau yang dibuka halaman editor, bukan deployment /exec.
       return jsonResponse({
         ok: false,
-        error: 'Respons backend tidak valid. Pastikan GAS_URL mengarah ke deployment Web App yang benar.',
+        error: 'Respons backend bukan JSON. Kemungkinan GAS_URL salah atau akses Web App bukan "Anyone".',
         code: 'UPSTREAM_INVALID',
-        detail: text.slice(0, 300)
+        upstreamStatus: upstream.status,
+        upstreamHost: safeHost(gasUrl),
+        detail: text.slice(0, 300),
+        help: [
+          'Pastikan GAS_URL berakhiran /exec (bukan /dev atau /edit).',
+          'Pastikan Deploy → Manage deployments → Who has access = Anyone.',
+          'Buka GAS_URL langsung di browser: harus menampilkan JSON, bukan halaman login Google.'
+        ]
       }, 502, cors);
+    }
+
+    if (payload && payload.code === 'FORBIDDEN') {
+      payload.help = [
+        'API_KEY di Cloudflare tidak sama dengan kunci di Apps Script.',
+        'Jalankan setApiKey() di editor Apps Script untuk melihat nilai yang benar.'
+      ];
     }
 
     return jsonResponse(payload, upstream.ok ? 200 : 502, cors);
   }
 };
+
+function safeHost(url) {
+  try {
+    return new URL(url).host;
+  } catch (err) {
+    return null;
+  }
+}

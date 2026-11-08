@@ -11,7 +11,7 @@
  *      public/            → aset statis (index.html, config.js, _headers…)
  *      functions/api.js   → file ini, menangani /api
  *
- *  VARIABEL (Pages → Settings → Environment variables):
+ *  VARIABEL (Pages → Settings → Variables and Secrets):
  *    GAS_URL   : URL Web App Apps Script, diakhiri /exec   [wajib]
  *    API_KEY   : kunci dari setApiKey() di Code.gs         [disarankan]
  *
@@ -19,7 +19,7 @@
  *    Cloudflare Dashboard → Workers & Pages → Create → Pages
  *    → Connect to Git → Root directory: cloudflare/pages
  *    → Build output directory: public
- *    (Framework preset: None)
+ *    (Framework preset: None, build command: kosong)
  *
  *  File ini berjalan di server Cloudflare, sehingga API_KEY aman
  *  dan tidak pernah dikirim ke browser.
@@ -59,6 +59,16 @@ function json(body, status) {
   });
 }
 
+/** Pesan bantuan yang menjelaskan cara memperbaiki konfigurasi. */
+function configHelp() {
+  return [
+    'Buka Cloudflare Dashboard → Workers & Pages → project ini → Settings → Variables and Secrets.',
+    'Tambahkan GAS_URL (URL Web App Apps Script, diakhiri /exec) sebagai Secret.',
+    'Tambahkan API_KEY (hasil fungsi setApiKey() di Apps Script) sebagai Secret.',
+    'Lalu Deployments → Retry deployment agar variabel terbaca.'
+  ];
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -71,7 +81,9 @@ export async function onRequest(context) {
         status: 'ok',
         time: new Date().toISOString(),
         backendConfigured: !!env.GAS_URL,
-        apiKeyConfigured: !!env.API_KEY
+        apiKeyConfigured: !!env.API_KEY,
+        gasUrlHost: env.GAS_URL ? safeHost(env.GAS_URL) : null,
+        help: env.GAS_URL ? undefined : configHelp()
       }
     });
   }
@@ -83,8 +95,9 @@ export async function onRequest(context) {
   if (!env.GAS_URL) {
     return json({
       ok: false,
-      error: 'Backend belum dikonfigurasi. Set environment variable GAS_URL di Cloudflare Pages.',
-      code: 'NOT_CONFIGURED'
+      error: 'Backend belum dikonfigurasi: environment variable GAS_URL kosong.',
+      code: 'NOT_CONFIGURED',
+      help: configHelp()
     }, 500);
   }
 
@@ -130,9 +143,21 @@ export async function onRequest(context) {
   }
 
   /* ------------------------------------------------- Teruskan ke Apps Script */
-  // Apps Script doPost tidak membaca header kustom dengan andal,
-  // jadi API key dikirim melalui query string sekaligus body.
-  const target = new URL(env.GAS_URL);
+  let target;
+  try {
+    target = new URL(env.GAS_URL);
+  } catch (err) {
+    return json({
+      ok: false,
+      error: 'GAS_URL bukan URL yang valid: ' + env.GAS_URL,
+      code: 'NOT_CONFIGURED',
+      help: ['Pastikan GAS_URL diawali https:// dan diakhiri /exec.']
+    }, 500);
+  }
+
+  // Peringatan bila URL tidak berakhiran /exec (sering jadi penyebab gagal).
+  const urlLooksWrong = !/\/exec\/?$/.test(target.pathname);
+
   if (env.API_KEY) target.searchParams.set('key', env.API_KEY);
 
   const forwardBody = env.API_KEY
@@ -155,7 +180,8 @@ export async function onRequest(context) {
       ok: false,
       error: 'Tidak dapat menghubungi backend Apps Script.',
       code: 'UPSTREAM_ERROR',
-      detail: String(err && err.message ? err.message : err)
+      detail: String(err && err.message ? err.message : err),
+      help: ['Periksa apakah GAS_URL benar dan deployment Web App masih aktif.']
     }, 502);
   }
 
@@ -165,13 +191,38 @@ export async function onRequest(context) {
   try {
     payload = JSON.parse(text);
   } catch (err) {
+    // Respons HTML biasanya berarti: URL salah, akses bukan "Anyone",
+    // atau yang dibuka halaman editor, bukan deployment /exec.
     return json({
       ok: false,
-      error: 'Respons backend tidak valid. Pastikan GAS_URL mengarah ke deployment Web App yang benar.',
+      error: 'Respons backend bukan JSON. Kemungkinan GAS_URL salah atau akses Web App bukan "Anyone".',
       code: 'UPSTREAM_INVALID',
-      detail: text.slice(0, 300)
+      upstreamStatus: upstream.status,
+      upstreamHost: safeHost(env.GAS_URL),
+      urlLooksWrong: urlLooksWrong,
+      detail: text.slice(0, 300),
+      help: [
+        'Pastikan GAS_URL berakhiran /exec (bukan /dev atau /edit).',
+        'Pastikan Deploy → Manage deployments → Who has access = Anyone.',
+        'Buka GAS_URL langsung di browser: harus menampilkan JSON, bukan halaman login Google.'
+      ]
     }, 502);
   }
 
+  if (payload && payload.code === 'FORBIDDEN') {
+    payload.help = [
+      'API_KEY di Cloudflare tidak sama dengan kunci di Apps Script.',
+      'Jalankan setApiKey() di editor Apps Script untuk melihat nilai yang benar.'
+    ];
+  }
+
   return json(payload, upstream.ok ? 200 : 502);
+}
+
+function safeHost(url) {
+  try {
+    return new URL(url).host;
+  } catch (err) {
+    return null;
+  }
 }

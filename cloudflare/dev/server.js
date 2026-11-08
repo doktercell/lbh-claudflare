@@ -35,7 +35,14 @@ const API_KEY = process.env.API_KEY || '';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
 
 const PAGES_DIR = path.resolve(__dirname, '..', 'pages', 'public');
-const WORKER_ENTRY = path.resolve(__dirname, '..', 'worker', 'src', 'index.js');
+
+// MODE menentukan kode proxy yang diuji:
+//   pages  → cloudflare/pages/functions/api.js  (default, sesuai Opsi A)
+//   worker → cloudflare/worker/src/index.js     (Opsi B)
+const MODE = String(process.env.MODE || 'pages').toLowerCase();
+const PROXY_ENTRY = MODE === 'worker'
+  ? path.resolve(__dirname, '..', 'worker', 'src', 'index.js')
+  : path.resolve(__dirname, '..', 'pages', 'functions', 'api.js');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -119,8 +126,8 @@ async function handleApi(req, res) {
       body: body && body.length ? body : undefined
     });
 
-    // Muat ulang setiap request agar perubahan kode Worker langsung terlihat.
-    const mod = await import(pathToFileURL(WORKER_ENTRY).href + '?t=' + Date.now());
+    // Muat ulang setiap request agar perubahan kode proxy langsung terlihat.
+    const mod = await import(pathToFileURL(PROXY_ENTRY).href + '?t=' + Date.now());
 
     const env = {
       GAS_URL,
@@ -128,7 +135,10 @@ async function handleApi(req, res) {
       ALLOWED_ORIGIN
     };
 
-    const response = await mod.default.fetch(request, env);
+    // Pages Function memakai onRequest, Worker memakai default.fetch.
+    const response = typeof mod.onRequest === 'function'
+      ? await mod.onRequest({ request, env })
+      : await mod.default.fetch(request, env);
     const text = await response.text();
 
     const outHeaders = {};
@@ -165,10 +175,12 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log('');
-  console.log('  LBH ASYSYUJA — dev server (Cloudflare Pages + Worker)');
+  console.log('  LBH ASYSYUJA — dev server (Cloudflare mode)');
   console.log('  → http://localhost:' + PORT);
   console.log('  Static : cloudflare/pages/public');
-  console.log('  Worker : cloudflare/worker/src/index.js');
+  console.log('  Proxy  : ' + (MODE === 'worker'
+    ? 'cloudflare/worker/src/index.js'
+    : 'cloudflare/pages/functions/api.js') + '  (MODE=' + MODE + ')');
   console.log('  Backend: ' + GAS_URL);
   console.log('  API key: ' + (API_KEY ? '(diset)' : '(kosong)'));
   console.log('');
